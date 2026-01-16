@@ -20,6 +20,8 @@ intra_char_len <- 1
 inter_char_len <- 3
 inter_word_len <- 7
 base_len <- 16
+note <- 69 #A4 note, 440 Hz
+velocity <- 100
 
 # Read in the data
 morse_key <- read.csv(morse_code_file)
@@ -27,6 +29,10 @@ morse_key <- read.csv(morse_code_file)
 # Convert to Morse code
 
 # Convert to table
+
+# Set default note and velocities
+midi_table$V5 <- note
+midi_table$V6 <- velocity
 
 # Add table header
 midi_csv <-
