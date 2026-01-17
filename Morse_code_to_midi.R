@@ -7,7 +7,8 @@
 # pip install py_midicsv
 
 # Libraries
-library(dplyr)
+library(dplyr) # Data frame and piping etc
+library(stringr) # String manipulation
 
 # Input
 text_file <- "text.txt"
@@ -23,10 +24,31 @@ base_len <- 16
 note <- 69 #A4 note, 440 Hz
 velocity <- 100
 
-# Read in the data
-morse_key <- read.csv(morse_code_file)
+# Read in morse code key and intersperse special characters
+morse_key <- read.csv(morse_code_file) %>%
+    mutate(code = sapply(strsplit(code, ""), paste, collapse="*")) %>%
+    bind_rows(
+        data.frame(
+            char = c("|", "_"),
+            code = c("|", "_")
+        )
+    )
 
-# Convert to Morse code
+# Create a named lookup vector
+lookup <- setNames(morse_key$code, morse_key$char)
+
+# Read in and convert text
+input_text <- sapply(strsplit(toupper(trimws(readLines(text_file), "b")), ""), paste, collapse="|") %>%
+    str_replace_all("\\| \\|", "_") %>%
+    strsplit("") %>%
+    unlist() %>%
+    {lookup[.]} %>% # Index the lookup vector
+    paste(collapse = "")
+
+# Split into a vector
+input_text <- as.vector(str_split_fixed(input_text, pattern = "", n = nchar(input_text)))
+
+# Replace characters with timings
 
 # Convert to table
 
