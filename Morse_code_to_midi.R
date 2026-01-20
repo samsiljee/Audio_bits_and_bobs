@@ -35,26 +35,47 @@ morse_key <- read.csv(morse_code_file) %>%
     )
 
 # Create a named lookup vector
-lookup <- setNames(morse_key$code, morse_key$char)
+morse_lookup <- setNames(morse_key$code, morse_key$char)
 
 # Read in and convert text
 input_text <- sapply(strsplit(toupper(trimws(readLines(text_file), "b")), ""), paste, collapse="|") %>%
     str_replace_all("\\| \\|", "_") %>%
     strsplit("") %>%
     unlist() %>%
-    {lookup[.]} %>% # Index the lookup vector
+    {morse_lookup[.]} %>% # Index the lookup vector
     paste(collapse = "")
 
 # Split into a vector
 input_text <- as.vector(str_split_fixed(input_text, pattern = "", n = nchar(input_text)))
 
+# Create lookup for timings
+timing_lookup <- c(
+    "." = dot_len,
+    "-" = dash_len,
+    "*" = intra_char_len,
+    "|" = inter_char_len,
+    "_" = inter_word_len
+)
+
 # Replace characters with timings
+timings <- input_text %>% {timing_lookup[.]}
 
-# Convert to table
+# Make timing vector
+time_vector <- 0
+current_time <- 0
+for(i in 1:length(timings)){
+    current_time <- current_time + timings[i]
+    time_vector <- c(time_vector, current_time)
+}
 
-# Set default note and velocities
-midi_table$V5 <- note
-midi_table$V6 <- velocity
+# Make table
+midi_table <- data.frame(
+    V1 = 1,
+    V2 = time_vector,
+    V3 = rep(c("Note_on_c", "Note_off_c"), length.out = length(time_vector)),
+    V4 = 0,
+    V5 = note,
+    V6 = velocity)
 
 # Add table header
 midi_csv <-
@@ -63,12 +84,13 @@ midi_csv <-
             V1 = c(0,1,1),
             V2 = c(0,0,0),
             V3 = c("Header", "Start_track", "Tempo"),
-            V4 = as.integer(c(0, NA, 500000)),
+            V4 = c(0, NA, 500000),
             V5 = c(1, NA, NA),
             V6 = c(128, NA, NA)
         ),
         midi_table
-    )
+    ) %>%
+    mutate(V4 = as.integer(V4))
 
 # Write table
 write.table(midi_csv, file = "midi_csv.csv", row.names = FALSE, quote = FALSE, col.names = FALSE, sep = ",")
