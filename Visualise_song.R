@@ -104,7 +104,7 @@ for(i in 1:n_frames){
     col_l_r <- c(
         col_l_r,
         mean(
-            select(filter(fft_data, channel == "l" & frame == i), intensity)[1:(1/6*signal_length)]
+            select(filter(fft_data, channel == "l" & frame == i), intensity)[1:(1/6*signal_length),]
         )
     )
     
@@ -112,7 +112,7 @@ for(i in 1:n_frames){
     col_l_g <- c(
         col_l_g,
         mean(
-            select(filter(fft_data, channel == "l" & frame == i), intensity)[(1/6*signal_length):(2/6*signal_length)]
+            select(filter(fft_data, channel == "l" & frame == i), intensity)[(1/6*signal_length):(2/6*signal_length),]
         )
     )
     
@@ -120,7 +120,7 @@ for(i in 1:n_frames){
     col_l_b <- c(
         col_l_b,
         mean(
-            select(filter(fft_data, channel == "l" & frame == i), intensity)[(2/6*signal_length):(3/6*signal_length)]
+            select(filter(fft_data, channel == "l" & frame == i), intensity)[(2/6*signal_length):(3/6*signal_length),]
         )
     )
     
@@ -128,7 +128,7 @@ for(i in 1:n_frames){
     col_r_r <- c(
         col_r_r,
         mean(
-            select(filter(fft_data, channel == "r" & frame == i), intensity)[(3/6*signal_length):(4/6*signal_length)]
+            select(filter(fft_data, channel == "r" & frame == i), intensity)[(3/6*signal_length):(4/6*signal_length),]
         )
     )
     
@@ -136,7 +136,7 @@ for(i in 1:n_frames){
     col_r_g <- c(
         col_r_g,
         mean(
-            select(filter(fft_data, channel == "r" & frame == i), intensity)[(4/6*signal_length):(5/6*signal_length)]
+            select(filter(fft_data, channel == "r" & frame == i), intensity)[(4/6*signal_length):(5/6*signal_length),]
         )
     )
     
@@ -144,7 +144,7 @@ for(i in 1:n_frames){
     col_r_b <- c(
         col_r_b,
         mean(
-            select(filter(fft_data, channel == "r" & frame == i), intensity)[(5/6*signal_length):signal_length]
+            select(filter(fft_data, channel == "r" & frame == i), intensity)[(5/6*signal_length):signal_length,]
         )
     )
     
