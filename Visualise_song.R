@@ -7,6 +7,7 @@
 # Libraries
 library(tuneR) # read in .wav files
 library(dplyr) # piping and data manipulation utilities
+library(tidyr) # pivot_wider
 library(ggplot2) # Make the plots for the graphics
 library(av) # Produce the resulting video
 
@@ -82,94 +83,40 @@ for(i in 1:n_frames){
 # Scale contrast vector
 contrast <- contrast / max(contrast)
 
-# Make colour vector from FFT data
-# Filter segments for L/R RGB sections
-# Initialise some vectors
-col_l_r <- vector()
-col_l_g <- vector()
-col_l_b <- vector()
-col_r_r <- vector()
-col_r_g <- vector()
-col_r_b <- vector()
+# Add a frequency band variable to the fft data
+signal_length <- max(fft_data$mz)
+band <- c(
+    rep("l_r", floor(signal_length / 6)),
+    rep("l_g", floor(signal_length / 6)),
+    rep("l_b", floor(signal_length / 6)),
+    rep("r_r", floor(signal_length / 6)),
+    rep("r_g", floor(signal_length / 6)),
+    rep("r_b", floor(signal_length / 6)),
+    rep("r_b", signal_length %% 6)
+) %>% as.factor
+fft_data$band <- rep(band, n_frames)
 
-# Loop through time segments to add to colour vectors
-progress <- 0
-for(i in 1:n_frames){
-    # Define times for the frame
-    start_point <- round((i - 1) / video_fps * sample_rate) + 1
-    end_point <- round(i / video_fps * sample_rate)
-    signal_length <- end_point - start_point + 1
-    
-    # Add left channel red value
-    col_l_r <- c(
-        col_l_r,
-        mean(
-            select(filter(fft_data, channel == "l" & frame == i), intensity)[1:(1/6*signal_length),]
-        )
-    )
-    
-    # Add left channel green value
-    col_l_g <- c(
-        col_l_g,
-        mean(
-            select(filter(fft_data, channel == "l" & frame == i), intensity)[(1/6*signal_length):(2/6*signal_length),]
-        )
-    )
-    
-    # Add left channel blue value
-    col_l_b <- c(
-        col_l_b,
-        mean(
-            select(filter(fft_data, channel == "l" & frame == i), intensity)[(2/6*signal_length):(3/6*signal_length),]
-        )
-    )
-    
-    # Add right channel red value
-    col_r_r <- c(
-        col_r_r,
-        mean(
-            select(filter(fft_data, channel == "r" & frame == i), intensity)[(3/6*signal_length):(4/6*signal_length),]
-        )
-    )
-    
-    # Add right channel green value
-    col_r_g <- c(
-        col_r_g,
-        mean(
-            select(filter(fft_data, channel == "r" & frame == i), intensity)[(4/6*signal_length):(5/6*signal_length),]
-        )
-    )
-    
-    # Add right channel blue value
-    col_r_b <- c(
-        col_r_b,
-        mean(
-            select(filter(fft_data, channel == "r" & frame == i), intensity)[(5/6*signal_length):signal_length,]
-        )
-    )
-    
-    # Update progress
-    if(progress != round(i*100/n_frames)){
-        progress <- round(i*100/n_frames)
-        print(paste0("Progress: ", progress, "%"))
-    }
-}
+# Make vectors to be used for colours
+col_data <- fft_data %>%
+    group_by(frame, band) %>%
+    summarise(intensity = mean(intensity)) %>%
+    pivot_wider(names_from = band, values_from = intensity)
 
 # Normalise and convert to 8-bit
-col_l_r <- round(col_l_r / max(col_l_r) * 255)
-col_l_g <- round(col_l_g / max(col_g_r) * 255)
-col_l_b <- round(col_l_b / max(col_b_r) * 255)
-col_r_r <- round(col_r_r / max(col_r_r) * 255)
-col_r_g <- round(col_r_g / max(col_g_r) * 255)
-col_r_b <- round(col_r_b / max(col_b_r) * 255)
+col_l_r <- round(col_data$l_r / max(col_data$l_r) * 255)
+col_l_g <- round(col_data$l_g / max(col_data$l_g) * 255)
+col_l_b <- round(col_data$l_b / max(col_data$l_b) * 255)
+col_r_r <- round(col_data$r_r / max(col_data$r_r) * 255)
+col_r_g <- round(col_data$r_g / max(col_data$r_g) * 255)
+col_r_b <- round(col_data$r_b / max(col_data$r_b) * 255)
 
 # Convert to hexadecimal
-col_l_r <- as.hexmode(col_l_r)
-col_l_g <- as.hexmode(col_l_g)
-col_l_b <- as.hexmode(col_l_b)
-col_r_r <- as.hexmode(col_r_r)
-col_r_g <- as.hexmode(col_r_g)
-col_r_b <- as.hexmode(col_r_b)
+col_l_r <- sprintf("%02X", col_l_r)
+col_l_g <- sprintf("%02X", col_l_g)
+col_l_b <- sprintf("%02X", col_l_b)
+col_r_r <- sprintf("%02X", col_r_r)
+col_r_g <- sprintf("%02X", col_r_g)
+col_r_b <- sprintf("%02X", col_r_b)
 
 # Paste together for colour vector
 col_l <- paste0("#", col_l_r, col_l_g, col_l_b)
@@ -178,10 +125,18 @@ col_r <- paste0("#", col_r_r, col_r_g, col_r_b)
 # Main loop through for each frame
 progress <- 0
 for(i in 1:n_frames){
+    # Filter the data
+    spectrum_left <- fft_data %>%
+        filter(channel == "l" & frame == i) %>%
+        select(mz, intensity)
+    spectrum_right <- fft_data %>%
+        filter(channel == "r" & frame == i) %>%
+        select(mz, intensity)
+    
     # Make the double-plot
     double_plot(
-        spectrum_left = filter(fft_data, channel == "l" & frame == i),
-        spectrum_right = filter(fft_data, channel == "r" & frame == i),
+        spectrum_left = spectrum_left,
+        spectrum_right = spectrum_right,
         colour_1 = col_l[i],
         colour_2 = col_r[i],
         contrast = contrast[i])
