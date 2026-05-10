@@ -6,11 +6,12 @@
 library(dplyr) # Data manipulation
 library(png) # Read in PNG data
 library(tuneR) # Export the audio clip
+library(stringr) # File name change
 
 # Set some variables
-file_path <- "ULTRASOUND OBSTETRIC ANATOMY - Set 3 - Image 1.png" # Image to convert
+file_path <- "ULTRASOUND OBSTETRIC ANATOMY - Set 3 - Image 63.png" # Image to convert
 sample_rate <- 44100 # Audio sample rate
-duration <- 1 # Duration of the clip in seconds
+duration <- 8 # Duration of the clip in seconds
 freq_range <- c(50, 20000) # Frequencies to use in the audio
 log_freq <- TRUE # Use linear or log frequencies
 
@@ -21,9 +22,9 @@ image_data <- readPNG(file_path)
 image_data <- (image_data[,,1] + image_data[,,2] + image_data[,,3]) / 3
 
 # Use frequency range and image height to make vector of frequencies
-if(log_freq){
+if(log_freq){ # Use log frequencies
     freq_vector <- exp(seq(log(freq_range[2]), log(freq_range[1]), length.out = nrow(image_data)))
-} else {
+} else { # Use linear frequencies
     freq_vector <- seq(freq_range[2], freq_range[1], length.out = nrow(image_data))
 }
 
@@ -36,12 +37,7 @@ audio_matrix <- matrix(data = NA, nrow = nrow(image_data), ncol = sample_rate * 
 # Loop through image rows and frequency vector
 for(i in 1:nrow(image_data)){
     # Vector of pixel intensities
-    pixel_intensities <- pixel_intensities <- approx(
-        x = seq(0, 1, length.out = ncol(image_data)),
-        y = image_data[i,],
-        xout = seq(0, 1, length.out = sample_rate * duration),
-        method = "constant"
-    )$y
+    pixel_intensities <- spline(x = image_data[i,], n = sample_rate * duration)$y
     
     # Sine wave vector at the right frequency
     sine_vector <- sin(2 * pi * freq_vector[i] * time_seq)
@@ -58,4 +54,4 @@ audio_vector <- (audio_vector / max(abs(audio_vector))) * 32000
 
 # Export audio
 audio_wav <- Wave(round(audio_vector), samp.rate = sample_rate, bit = 16)
-writeWave(audio_wav, file = "Image_spectrogram.wav")
+writeWave(audio_wav, file = str_replace(file_path, ".png", ".wav"))
