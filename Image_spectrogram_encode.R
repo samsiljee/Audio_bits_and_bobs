@@ -11,7 +11,7 @@ library(stringr) # File name change
 # Set some variables
 file_path <- "ULTRASOUND OBSTETRIC ANATOMY - Set 3 - Image 63.png" # Image to convert
 sample_rate <- 44100 # Audio sample rate
-duration <- 8 # Duration of the clip in seconds
+duration <- 40 # Duration of the clip in seconds
 freq_range <- c(50, 20000) # Frequencies to use in the audio
 log_freq <- TRUE # Use linear or log frequencies
 
@@ -36,6 +36,9 @@ audio_matrix <- matrix(data = NA, nrow = nrow(image_data), ncol = sample_rate * 
 
 # Loop through image rows and frequency vector
 for(i in 1:nrow(image_data)){
+    # Print update
+    print(paste0("Progress: ", round(i / nrow(image_data) * 100), "%"))
+    
     # Vector of pixel intensities
     pixel_intensities <- spline(x = image_data[i,], n = sample_rate * duration)$y
     
@@ -55,3 +58,4 @@ audio_vector <- (audio_vector / max(abs(audio_vector))) * 32000
 # Export audio
 audio_wav <- Wave(round(audio_vector), samp.rate = sample_rate, bit = 16)
 writeWave(audio_wav, file = str_replace(file_path, ".png", ".wav"))
+
