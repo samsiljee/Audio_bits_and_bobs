@@ -11,7 +11,7 @@ library(stringr) # File name change
 # Set some variables
 file_path <- "ULTRASOUND OBSTETRIC ANATOMY - Set 3 - Image 63.png" # Image to convert
 sample_rate <- 44100 # Audio sample rate
-duration <- 40 # Duration of the clip in seconds
+duration <- 7*60 # Duration of the clip in seconds
 freq_range <- c(50, 20000) # Frequencies to use in the audio
 log_freq <- TRUE # Use linear or log frequencies
 
@@ -21,36 +21,34 @@ image_data <- readPNG(file_path)
 # Reduce to 2D greyscale, mean RGB channels
 image_data <- (image_data[,,1] + image_data[,,2] + image_data[,,3]) / 3
 
-# Use frequency range and image height to make vector of frequencies
-if(log_freq){ # Use log frequencies
-    freq_vector <- exp(seq(log(freq_range[2]), log(freq_range[1]), length.out = nrow(image_data)))
-} else { # Use linear frequencies
-    freq_vector <- seq(freq_range[2], freq_range[1], length.out = nrow(image_data))
+# Pre-calculate some variables
+n_rows    <- nrow(image_data)
+n_samples <- sample_rate * duration
+
+# Frequency vector
+if (log_freq) {
+    freq_vector <- exp(seq(log(freq_range[2]), log(freq_range[1]), length.out = n_rows))
+} else {
+    freq_vector <- seq(freq_range[2], freq_range[1], length.out = n_rows)
 }
 
-# Make time vector
-time_seq <- seq(0, duration, length.out = sample_rate * duration)
+# Time vector
+time_seq <- seq(0, duration, length.out = n_samples)
 
-# Initialise blank matrix for sine waves
-audio_matrix <- matrix(data = NA, nrow = nrow(image_data), ncol = sample_rate * duration)
+# Initialise blank vector for sine waves
+audio_vector <- numeric(n_samples)
 
 # Loop through image rows and frequency vector
-for(i in 1:nrow(image_data)){
-    # Print update
-    print(paste0("Progress: ", round(i / nrow(image_data) * 100), "%"))
+for(i in seq_len(n_rows)){
+    if (i %% 10 == 0)
+        cat(sprintf("Progress: %d%%\n", round(i / n_rows * 100)))
     
-    # Vector of pixel intensities
-    pixel_intensities <- spline(x = image_data[i,], n = sample_rate * duration)$y
+    # Interpolate pixel row to audio length
+    pixel_intensities <- spline(x = image_data[i, ], n = n_samples)$y
     
-    # Sine wave vector at the right frequency
-    sine_vector <- sin(2 * pi * freq_vector[i] * time_seq)
-    
-    # Multiply by pixel intensities and add to audio matrix
-    audio_matrix[i,] <- pixel_intensities * sine_vector
+    # Accumulate: amplitude-modulated sine wave added in place
+    audio_vector <- audio_vector + pixel_intensities * sin(2 * pi * freq_vector[i] * time_seq)
 }
-
-# Get column sums
-audio_vector <- colSums(audio_matrix)
 
 # Normalise vector
 audio_vector <- (audio_vector / max(abs(audio_vector))) * 32000
@@ -58,4 +56,3 @@ audio_vector <- (audio_vector / max(abs(audio_vector))) * 32000
 # Export audio
 audio_wav <- Wave(round(audio_vector), samp.rate = sample_rate, bit = 16)
 writeWave(audio_wav, file = str_replace(file_path, ".png", ".wav"))
-
