@@ -69,7 +69,7 @@ encode_spectrogram <- function(file_path,
     }
 
     # Interpolate pixel row to audio length
-    pixel_intensities <- spline(x = image_data[i, ], n = n_samples)$y
+    pixel_intensities <- approx(x = image_data[i, ], n = n_samples, method = "constant")$y
 
     # Accumulate: amplitude-modulated sine wave added in place
     audio_vector <- audio_vector + pixel_intensities * sin(2 * pi * freq_vector[i] * time_seq)
@@ -88,7 +88,7 @@ encode_spectrogram <- function(file_path,
 encode_spectrogram(
   file_path = "ULTRASOUND OBSTETRIC ANATOMY - Set 3 - Image 63.png",
   sample_rate = 44100,
-  duration = 8,
+  duration = 3*60,
   freq_range = c(50, 20000),
   freq_scaling = "log"
 )
