@@ -13,41 +13,96 @@ library(signal) # Make spectrograms
 audio_file <- "drone.wav"
 masking_file <- "spectral_3_no_drone.wav"
 window_size <- 1024
-window_overlap <- 0.5
+window_overlap <- round(window_size * 0.5)
+
+# Define some functions
+stft <- function(x, n, hop) {
+  # Returns a complex matrix: rows = frequency bins, cols = time frames
+  w <- hanning(n)
+  nframes <- floor((length(x) - n) / hop) + 1
+  S <- matrix(0 + 0i, nrow = n %/% 2 + 1, ncol = nframes)
+  for (i in seq_len(nframes)) {
+    start <- (i - 1) * hop + 1
+    segment <- x[start:(start + n - 1)] * w
+    full_fft <- fft(segment)
+    S[, i] <- full_fft[1:(n %/% 2 + 1)]
+  }
+  S
+}
+
+istft <- function(S, n, hop, original_length) {
+  # Overlap-add inverse STFT
+  nframes <- ncol(S)
+  w <- hanning(n)
+  out <- numeric(original_length)
+  win_sum <- numeric(original_length)
+
+  for (i in seq_len(nframes)) {
+    # Mirror spectrum and take real part of inverse FFT
+    full_spec <- c(S[, i], Conj(rev(S[-c(1, nrow(S)), i])))
+    segment <- Re(fft(full_spec, inverse = TRUE)) / n
+    start <- (i - 1) * hop + 1
+    end <- start + n - 1
+    idx <- start:end
+    out[idx] <- out[idx] + segment * w
+    win_sum[idx] <- win_sum[idx] + w^2
+  }
+
+  # Normalise for window overlap
+  nonzero <- win_sum > 1e-8
+  out[nonzero] <- out[nonzero] / win_sum[nonzero]
+  out
+}
+
+process_channel <- function(audio_vec, mask_vec, n, hop, intensity = 1) {
+    S_audio <- stft(audio_vec, n, hop)
+    S_mask  <- stft(mask_vec,  n, hop)
+    
+    audio_mag <- abs(S_audio)
+    mask_mag  <- abs(S_mask) + 1e-10
+    
+    # Ratio mask, normalised per time frame
+    mask <- audio_mag / mask_mag
+    col_maxes <- pmax(apply(mask, 2, max), 1e-10)
+    mask <- t(t(mask) / col_maxes)  # divide each column by its own max
+    
+    # Sharpen with intensity > 1 for more aggressive masking
+    mask <- mask^intensity
+    
+    # Apply mask, preserving phase
+    S_out <- mask * S_audio
+    
+    # Convert back to audio signal
+    istft(S_out, n, hop, length(audio_vec))
+}
+
+normalise <- function(audio_vec, bit = 16) {
+    scale <- 2^(bit - 1) - 1
+    as.integer(round(audio_vec / max(abs(audio_vec)) * scale))
+}
 
 # Import data
 audio <- readWave(audio_file)
 masking <- readWave(masking_file)
 
 # Trim longer audio to the same length as the shorter one
-min_length <- min(c(length(audio), length(masking)))
-audio <- audio[1:min_length]
-masking <- masking[1:min_length]
+min_length <- min(length(audio@left), length(masking@left))
 
-# Use FFT to transform to spectrogram
-audio_l <- abs(specgram(audio@left, n = window_size, overlap = window_overlap)$S)
-audio_r <- abs(specgram(audio@right, n = window_size, overlap = window_overlap)$S)
-masking_l <- abs(specgram(masking@left, n = window_size, overlap = window_overlap)$S)
-masking_r <- abs(specgram(masking@right, n = window_size, overlap = window_overlap)$S)
+# Extract audio vectors
+audio_l <- as.numeric(audio@left[1:min_length])
+audio_r <- as.numeric(audio@right[1:min_length])
+masking_l <- as.numeric(masking@left[1:min_length])
+masking_r <- as.numeric(masking@right[1:min_length])
 
-# Take inverse of masking spectrogram
-mask_l <- 1/masking_l
-mask_r <- 1/masking_r
-
-# Multiply input audio by inverse masking spectrogram
-masked_l <- audio_l * mask_l
-masked_r <- audio_r * mask_r
-
-# Revert from spectrogram back to waveform
+# Process each channel
+masked_l <- process_channel(audio_l, masking_l, window_size, window_overlap, intensity = 0.5)
+masked_r <- process_channel(audio_r, masking_r, window_size, window_overlap, intensity = 0.5)
 
 # Export masked audio
-# Write back to .wav file
 Wave(
-    left = round(masked_l),
-    right = round(masked_r),
-    samp.rate = audio@samp.rate,
-    bit = audio@bit
+  left = normalise(masked_l, audio@bit),
+  right = normalise(masked_r, audio@bit),
+  samp.rate = audio@samp.rate,
+  bit = audio@bit
 ) %>%
-    normalize(unit = as.character(audio@bit), center = TRUE, level = 1, rescale = TRUE) %>%
-    writeWave(file = paste0("masked_", audio_file))
-
+  writeWave(file = paste0("masked_", audio_file))
