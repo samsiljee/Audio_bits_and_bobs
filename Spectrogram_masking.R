@@ -59,18 +59,13 @@ process_channel <- function(audio_vec, mask_vec, n, hop, intensity = 1) {
     S_mask  <- stft(mask_vec,  n, hop)
     
     audio_mag <- abs(S_audio)
-    mask_mag  <- abs(S_mask) + 1e-10
+    mask_mag  <- abs(S_mask)
     
-    # Ratio mask, normalised per time frame
-    mask <- audio_mag / mask_mag
-    col_maxes <- pmax(apply(mask, 2, max), 1e-10)
-    mask <- t(t(mask) / col_maxes)  # divide each column by its own max
-    
-    # Sharpen with intensity > 1 for more aggressive masking
-    mask <- mask^intensity
+    # Make a mask
+    mask <- -1 * (mask_mag - max(mask_mag))
     
     # Apply mask, preserving phase
-    S_out <- mask * S_audio
+    S_out <- audio_mag * mask * S_audio
     
     # Convert back to audio signal
     istft(S_out, n, hop, length(audio_vec))
@@ -106,3 +101,4 @@ Wave(
   bit = audio@bit
 ) %>%
   writeWave(file = paste0("masked_", audio_file))
+
