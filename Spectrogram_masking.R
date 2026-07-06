@@ -54,7 +54,7 @@ istft <- function(S, n, hop, original_length) {
   out
 }
 
-process_channel <- function(audio_vec, mask_vec, n, hop, intensity = 1) {
+process_channel <- function(audio_vec, mask_vec, n, hop, intensity) {
     S_audio <- stft(audio_vec, n, hop)
     S_mask  <- stft(mask_vec,  n, hop)
     
@@ -63,9 +63,11 @@ process_channel <- function(audio_vec, mask_vec, n, hop, intensity = 1) {
     
     # Make a mask
     mask <- -1 * (mask_mag - max(mask_mag))
+    mask <- mask / max(mask)
+    mask <- mask^intensity
     
     # Apply mask, preserving phase
-    S_out <- audio_mag * mask * S_audio
+    S_out <- mask * S_audio
     
     # Convert back to audio signal
     istft(S_out, n, hop, length(audio_vec))
@@ -90,8 +92,8 @@ masking_l <- as.numeric(masking@left[1:min_length])
 masking_r <- as.numeric(masking@right[1:min_length])
 
 # Process each channel
-masked_l <- process_channel(audio_l, masking_l, window_size, window_overlap, intensity = 0.5)
-masked_r <- process_channel(audio_r, masking_r, window_size, window_overlap, intensity = 0.5)
+masked_l <- process_channel(audio_l, masking_l, window_size, window_overlap, intensity = 500)
+masked_r <- process_channel(audio_r, masking_r, window_size, window_overlap, intensity = 500)
 
 # Export masked audio
 Wave(
@@ -101,4 +103,3 @@ Wave(
   bit = audio@bit
 ) %>%
   writeWave(file = paste0("masked_", audio_file))
-
