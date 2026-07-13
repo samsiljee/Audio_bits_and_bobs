@@ -103,3 +103,20 @@ Wave(
   bit = audio@bit
 ) %>%
   writeWave(file = paste0("masked_", audio_file))
+
+
+# Try some different intensity values
+for(i in c(1, 10, 100, 1000, 10000, 10000, 1000000)){
+  # Process each channel
+  masked_l <- process_channel(audio_l, masking_l, window_size, window_overlap, intensity = i)
+  masked_r <- process_channel(audio_r, masking_r, window_size, window_overlap, intensity = i)
+  
+  # Export masked audio
+  Wave(
+    left = normalise(masked_l, audio@bit),
+    right = normalise(masked_r, audio@bit),
+    samp.rate = audio@samp.rate,
+    bit = audio@bit
+  ) %>%
+    writeWave(file = paste0("masked_", i, "_", audio_file))
+}
