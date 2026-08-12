@@ -1,0 +1,156 @@
+---
+title: "Sonification visualisation"
+author: "Sam Siljee"
+date: "2024-05-14"
+output: html_document
+---
+
+Markdown document for accompanying visualisation to sonification
+Sam Siljee
+19 March 2024
+MIT licence
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Libraries
+library(mzR)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+
+# Source functions
+source("functions.R")
+```
+
+```{r load data, include = FALSE}
+# Load and extract data
+ms_data <- openMSfile("test.mzML")
+ms_peaks <- peaks(ms_data)
+ms_header <- header(ms_data)
+
+# Get list of MS1 and MS2 spectrum indexes and rows
+ms1_indexes <- filter(ms_header, msLevel == 1) %>% .$seqNum
+ms2_indexes <- filter(ms_header, msLevel == 2) %>% .$seqNum
+
+# Load the test spectra
+spectrum_1 <- read.csv("test_spectra/spectrum_1.csv", header = TRUE)
+spectrum_2 <- read.csv("test_spectra/spectrum_2.csv", header = TRUE)
+```
+
+```{r single plots}
+# Write the plots to the plot folder
+for (i in 1:10) {
+  ms_peaks[[i]] %>%
+    plot_spectrum()
+  ggsave(
+    filename = paste0("plots/plot_", i, ".png"),
+    width = 4000,
+    height = 4000,
+    units = "px",
+    dpi = 600
+  )
+  print(i)
+}
+```
+
+```{r double plot test}
+# Plot the spectrum sideways
+spectrum_1 %>%
+  ggplot(aes(x = mz, y = intensity)) +
+  geom_col(width = 0.5, col = "black", position = "jitter") +
+  coord_flip() +
+  theme_void()
+
+# And plot the other spectrum in reverse
+spectrum_2 %>%
+  ggplot(aes(x = mz, y = -intensity)) +
+  geom_col(width = 0.5, col = "black", position = "jitter") +
+  coord_flip() +
+  theme_void()
+
+# Plot the two together
+rbind(
+  spectrum_1 %>% mutate(type = "MS1", intensity = intensity/max(intensity)),
+  spectrum_2 %>% mutate(type = "MS2", intensity = intensity/max(intensity))
+) %>%
+  ggplot(
+    aes(
+      x = mz,
+      y = ifelse(type == "MS1", -intensity, intensity),
+      fill = type)) +
+  scale_color_manual(
+    values = c("darkblue", "white"),
+    aesthetics = "fill") +
+  annotate(
+    geom = "rect", 
+    ymin = 0, 
+    ymax = Inf, 
+    xmin = -Inf, 
+    xmax = Inf, 
+    colour = NA, 
+    fill = "darkblue") + 
+  geom_col(
+    width = 5,
+    position = "jitter", 
+    show.legend = FALSE) +
+  coord_flip() +
+  theme_void()
+```
+
+## Second visualisation
+This time trying another way to visualise the plots.
+
+```{r Second visualisation, echo = TRUE, results = 'hide', message = FALSE, warning = FALSE}
+# Set some variables
+color_palette <- colorRampPalette(c("white", "darkblue"))
+x_dim <- 1920
+x_min <- min(spectrum_1$mz)
+x_max <- max(spectrum_1$mz)
+x_bin_size <- (max(spectrum_1$mz) - min(spectrum_1$mz)) / x_dim
+x_vect <- numeric(x_dim)
+y_dim <- 1080
+y_min <- min(spectrum_2$mz)
+y_max <- max(spectrum_2$mz)
+y_bin_size <- (max(spectrum_2$mz) - min(spectrum_2$mz)) / y_dim
+y_vect <- numeric(y_dim)
+
+# Convert the spectra to datatables
+setDT(spectrum_1)
+setDT(spectrum_2)
+
+# Create bins for mz values
+spectrum_1[, bin := cut(mz, breaks = seq(x_min, x_max, length.out = x_dim + 1), include.lowest = TRUE, labels = FALSE)]
+spectrum_2[, bin := cut(mz, breaks = seq(y_min, y_max, length.out = y_dim + 1), include.lowest = TRUE, labels = FALSE)]
+
+# Sum intensities within each bin
+x_binned_intensities <- spectrum_1[, .(total_intensity = sum(intensity, na.rm = TRUE)), by = bin]
+y_binned_intensities <- spectrum_2[, .(total_intensity = sum(intensity, na.rm = TRUE)), by = bin]
+
+# Fill in the vectors
+x_vect[x_binned_intensities$bin] <- x_binned_intensities$total_intensity
+y_vect[y_binned_intensities$bin] <- y_binned_intensities$total_intensity
+
+# Normalise the vectors
+x_vect <- x_vect / max(x_vect)
+y_vect <- y_vect / max(y_vect)
+
+# Add the two vectors together to create a matrix
+image_matrix <- outer(y_vect, x_vect, "+")
+
+# Scale the matrix from 0 to 1
+image_matrix <- image_matrix / max(image_matrix)
+
+# Write the matrix to a PNG file
+png("custom_color_image.png", width = x_dim, height = y_dim)
+par(mar = c(0, 0, 0, 0))  # Remove margins
+
+# Create the image
+image(
+  1:x_dim, 1:y_dim,
+  t(image_matrix[y_dim:1,]),
+  col = color_palette(256), axes = FALSE, xlab = "", ylab = ""
+)
+dev.off()
+```
+
