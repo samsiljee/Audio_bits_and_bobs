@@ -1,0 +1,70 @@
+---
+title: "AZ"
+author: "Sam Siljee"
+date: "2026-08-12"
+output: html_document
+---
+
+Script to sonify some data from Ethan
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load packages
+library(tuneR) # audio handling
+library(dplyr) # data manipulation
+library(stringr) # string manipulation
+library(readxl) # read in Excel data
+
+# Load functions from MS_sonification directory
+source("MS_sonification/functions.R")
+
+# Read in AZ# to compound name reference table
+AZ_ref <- read_excel("AZ/data/AZ COLLECTION.XLS", sheet = 1)
+```
+
+# MS
+Chunk to sonify some mass spec data
+```{r MS}
+# Iterate over the AZ numbers to get some data
+for(i in AZ_ref$`AZ#`){
+    
+    # Check if data is present
+    if(file.exists(paste0("AZ/data/MS/OLD/MS/", i, ".CSV"))){
+        
+        # Read in the data
+        MS_data <- read.csv(paste0("AZ/data/MS/OLD/MS/", i, ".CSV"))
+        names(MS_data) <- c("mz", "intensity")
+        
+        # Make the tone
+        MS_tone <- advanced_spectrum_to_tone(
+            MS_data,
+            duration = 5,
+            # scale = TRUE,
+            scale_min = 300,
+            scale_max = 5000
+        )
+        
+        # Make file path for output
+        out_path <- paste0(
+            "AZ/output/MS/",
+            i,
+            "_",
+            AZ_ref$`Compound Name`[AZ_ref$`AZ#` == i],
+            ".wav"
+        )
+        
+        # Write to directory
+        writeWave(MS_tone, file = out_path)
+    }
+}
+```
+
+# UV
+Chunk to sonify (presumably) UV absorbance on LC??
+```{r}
+# Get list of files
+UV_files <- list.files("AZ/data/UV/", pattern = "*.PRN")
+UV_data <- read.delim(paste0("AZ/data/UV/", UV_files[1]), sep = "\t")
+names(UV_data) <- c("mz", "intensity")
+```
