@@ -5,7 +5,7 @@ date: "2026-08-12"
 output: html_document
 ---
 
-Script to sonify some data from Ethan
+Script to sonify some data from Ethan Woolley
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -51,7 +51,7 @@ for(i in AZ_ref$`AZ#`){
             i,
             "_",
             AZ_ref$`Compound Name`[AZ_ref$`AZ#` == i],
-            ".wav"
+            "_MS.wav"
         )
         
         # Write to directory
@@ -65,6 +65,85 @@ Chunk to sonify (presumably) UV absorbance on LC??
 ```{r}
 # Get list of files
 UV_files <- list.files("AZ/data/UV/", pattern = "*.PRN")
-UV_data <- read.delim(paste0("AZ/data/UV/", UV_files[1]), sep = "\t")
-names(UV_data) <- c("mz", "intensity")
+
+# Iterate through files
+for(i in UV_files){
+    # Read in the data
+    UV_data <- read.delim(paste0("AZ/data/UV/", i), sep = "\t", header = FALSE)
+    names(UV_data) <- c("mz", "intensity")
+    
+    # Extract AZ number
+    j <- str_remove(i, ".PRN") %>%
+        str_remove("AZ")
+    
+    # Get AZ number for compound ref
+    k <- as.numeric(str_split_i(j, "_", i = 1))
+    
+    # Make the tone
+    UV_tone <- advanced_spectrum_to_tone(
+        UV_data,
+        duration = 5,
+        # scale = TRUE,
+        scale_min = 300,
+        scale_max = 5000
+    )
+    
+    # Make file path for output
+    out_path <- paste0(
+        "AZ/output/UV/",
+        j,
+        "_",
+        AZ_ref$`Compound Name`[AZ_ref$`AZ#` == k],
+        "_UV.wav"
+    )
+    
+    # Write to directory
+    writeWave(UV_tone, file = out_path)
+}
+```
+
+# IR
+Chunk to sonify (presumably) IR absorbance on LC??
+```{r}
+# Get list of files
+IR_files <- list.files("AZ/data/IR/PTN/", pattern = "*.PRN")
+
+# Iterate through files
+for(i in IR_files){
+    # Extract AZ number
+    j <- str_remove(i, ".PRN") %>%
+        str_remove("AZ") %>%
+        as.numeric()
+    
+    # Read in the data
+    IR_data <- read.delim(paste0("AZ/data/IR/PTN/", i), sep = "", header = FALSE)
+    
+    names(IR_data) <- c("mz", "intensity")
+    
+    # Bump up intensity values
+    if(min(IR_data$intensity) < 0){
+        IR_data$intensity <- IR_data$intensity - min(IR_data$intensity)
+    }
+    
+    # Make the tone
+    IR_tone <- advanced_spectrum_to_tone(
+        IR_data,
+        duration = 5,
+        # scale = TRUE,
+        scale_min = 300,
+        scale_max = 5000
+    )
+    
+    # Make file path for output
+    out_path <- paste0(
+        "AZ/output/IR/",
+        j,
+        "_",
+        AZ_ref$`Compound Name`[AZ_ref$`AZ#` == j],
+        "_IR.wav"
+    )
+    
+    # Write to directory
+    writeWave(IR_tone, file = out_path)
+}
 ```
