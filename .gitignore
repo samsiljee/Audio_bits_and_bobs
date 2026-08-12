@@ -5,6 +5,9 @@
 *.mp4
 *.csv
 
+# Data from specific directories
+AZ/data/*
+
 # History files
 .Rhistory
 .Rapp.history
