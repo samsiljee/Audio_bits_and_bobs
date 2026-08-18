@@ -1,0 +1,10 @@
+---
+title: "Petrik_NMR"
+author: "Sam Siljee"
+date: "2026-08-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```

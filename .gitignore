@@ -8,6 +8,8 @@
 # Data from specific directories
 AZ/data/*
 AZ/output/*
+Petrik_NMR/data/*
+Petrik_NMR/output/*
 
 # History files
 .Rhistory
